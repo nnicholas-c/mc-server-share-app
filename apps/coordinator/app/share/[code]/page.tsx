@@ -32,9 +32,9 @@ export default async function SharePage({
   return (
     <main className="page-shell">
       <nav className="topbar" aria-label="Coordinator">
-        <span className="brand">MC Server Share</span>
-        <a className="health-link" href="/api/health">
-          API health
+        <a className="brand" href="/">MC Server Share</a>
+        <a className="health-link" href="/guide">
+          How to Host →
         </a>
       </nav>
 
