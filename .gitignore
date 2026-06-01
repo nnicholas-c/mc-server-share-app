@@ -1,0 +1,35 @@
+node_modules/
+dist/
+.next/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# Local app and deployment state
+.env
+.env.*
+!.env.example
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+
+# The legacy bundled server remains local-only. Import it with the
+# migration script or desktop app; do not commit live worlds/mods/logs.
+server1.20.4/
+artifacts/
+mc-share-data/
+
+# Generated Minecraft runtime files if users import servers into the repo.
+logs/
+crash-reports/
+world/
+world_nether/
+world_the_end/
+*.mca
+*.mcr
+session.lock
+
+# Tunnel binaries and local machine config.
+ngrok.exe
+.ngrok.exe.old
+playit*
+*.local.json

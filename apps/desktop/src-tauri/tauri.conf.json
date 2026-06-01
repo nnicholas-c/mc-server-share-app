@@ -1,0 +1,31 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.0.0",
+  "productName": "MC Server Share",
+  "version": "0.1.0",
+  "identifier": "app.mc-share.desktop",
+  "build": {
+    "beforeDevCommand": "npm run build --workspace @mc-share/protocol && vite --host 127.0.0.1",
+    "beforeBuildCommand": "npm run build --workspace @mc-share/protocol && vite build",
+    "devUrl": "http://127.0.0.1:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "MC Server Share",
+        "width": 1180,
+        "height": 820,
+        "minWidth": 860,
+        "minHeight": 640,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all"
+  }
+}

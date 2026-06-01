@@ -1,0 +1,25 @@
+[package]
+name = "mc-server-share"
+version = "0.1.0"
+description = "Cross-platform Minecraft Java server sharing app"
+authors = ["MC Server Share"]
+edition = "2021"
+
+[lib]
+name = "mc_server_share_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+tar = "0.4"
+tauri = { version = "2.0", features = [] }
+tauri-plugin-dialog = "2.0"
+tauri-plugin-fs = "2.0"
+walkdir = "2.5"
+zstd = "0.13"
