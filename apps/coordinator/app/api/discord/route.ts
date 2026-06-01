@@ -48,7 +48,6 @@ async function buildHostMessage(): Promise<string> {
     const deepLink = `mcservershare://share/${shareCode}?coordinator=${encodeURIComponent(coordinatorUrl)}`;
 
     if (manifest.activeSession) {
-      const since = new Date(manifest.activeSession.expiresAt);
       return `🟢 **${manifest.activeSession.hostDisplayName}** is hosting **${manifest.name}** right now. Check back when they're done!`;
     }
 
