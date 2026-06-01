@@ -33,3 +33,5 @@ ngrok.exe
 .ngrok.exe.old
 playit*
 *.local.json
+.vercel
+.env*
