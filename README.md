@@ -17,10 +17,15 @@ A small app that lets a group of friends take turns hosting a Minecraft server w
 
 ## Step 1 — Install the app (everyone, one time)
 
+| Your computer | What to download |
+|---------------|-----------------|
+| Windows | `MC.Server.Share_…_x64-setup.exe` |
+| Mac (M1/M2/M3) | `MC.Server.Share_…_aarch64.dmg` |
+| Mac (older Intel) | `MC.Server.Share_…_x64.dmg` |
+
 1. Go to **https://mc-server-share-app.vercel.app**
-2. Click **Download App**
-3. Run the installer (`MC.Server.Share_…_x64-setup.exe`)
-4. If Windows shows a warning, click **More info → Run anyway**
+2. Click **Download App** and grab the right file for your computer
+3. Run it — on Windows click **More info → Run anyway** if a security warning appears; on Mac drag the app to your Applications folder
 
 The app only needs to be installed once.
 
@@ -34,13 +39,15 @@ Open MC Server Share. You'll see three panels.
 2. The app automatically connects to the right server (code `XQZPU8`). If it doesn't, type `XQZPU8` in the **Share code** box and click **Load Share**.
 3. That's it — the app remembers everything from here on.
 
+> **You do not need any server files.** The app downloads the full server (mods, configs, world) from the cloud the first time you click Download & Host. Friends just install the app and enter their name — nothing else is needed before hosting.
+
 ---
 
 ## Step 3 — Hosting (your turn)
 
 1. Open the app — it loads your settings automatically.
 2. Click **Download & Host**.
-   - The app downloads the latest world from whoever hosted last (~1–5 min depending on your internet).
+   - The app downloads the full server and the latest world (~1–5 min on first run, faster after that).
    - The Minecraft server starts automatically.
    - playit.gg starts and creates a public address for friends to connect.
 3. A join address like `abc123.joinmc.io:12345` appears in the **Logs** panel at the bottom. Share it in Discord.
@@ -71,6 +78,9 @@ Type `/host` in the Discord server at any time to:
 
 **"Windows protected your PC" when installing**
 → Click **More info**, then **Run anyway**. The app isn't signed with a paid certificate but it's safe.
+
+**"MC Server Share can't be opened because Apple can't check it for malicious software" on Mac**
+→ Right-click the app in Finder → **Open** → **Open** again in the dialog. You only need to do this once.
 
 **App says "Restoring last session…" and freezes**
 → Check your internet connection and try again. The coordinator might be briefly unavailable.

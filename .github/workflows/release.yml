@@ -43,17 +43,117 @@ jobs:
         env:
           VITE_DEFAULT_COORDINATOR_URL: https://mc-server-share-app.vercel.app
 
-      - name: Create GitHub Release
+      - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: MC Server Share ${{ github.ref_name }}
           body: |
-            Download **MC-Server-Share_${{ github.ref_name }}_x64-setup.exe** below and run it. No dev tools required.
+            ### Download
 
-            **First time?** See the [Hosting Guide](https://github.com/nnicholas-c/mc-server-share-app/blob/main/docs/hosting-guide.md).
+            | Platform | File |
+            |----------|------|
+            | Windows | `MC.Server.Share_…_x64-setup.exe` |
+            | Mac (Apple Silicon) | `MC.Server.Share_…_aarch64.dmg` |
+            | Mac (Intel) | `MC.Server.Share_…_x64.dmg` |
+
+            Run the installer. Windows may show a security warning — click **More info → Run anyway**.
+
+            **First time?** See the [How to Host guide](https://github.com/nnicholas-c/mc-server-share-app/blob/main/docs/hosting-guide.md).
           draft: false
           prerelease: false
           files: apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-mac-arm:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build protocol package
+        run: npm run build --workspace @mc-share/protocol
+
+      - name: Build frontend
+        working-directory: apps/desktop
+        run: npm exec -- vite build
+        env:
+          VITE_DEFAULT_COORDINATOR_URL: https://mc-server-share-app.vercel.app
+
+      - name: Build Tauri app
+        working-directory: apps/desktop
+        run: npm run tauri -- build --bundles dmg
+        env:
+          VITE_DEFAULT_COORDINATOR_URL: https://mc-server-share-app.vercel.app
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-mac-intel:
+    runs-on: macos-13
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build protocol package
+        run: npm run build --workspace @mc-share/protocol
+
+      - name: Build frontend
+        working-directory: apps/desktop
+        run: npm exec -- vite build
+        env:
+          VITE_DEFAULT_COORDINATOR_URL: https://mc-server-share-app.vercel.app
+
+      - name: Build Tauri app
+        working-directory: apps/desktop
+        run: npm run tauri -- build --bundles dmg
+        env:
+          VITE_DEFAULT_COORDINATOR_URL: https://mc-server-share-app.vercel.app
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
