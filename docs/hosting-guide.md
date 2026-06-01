@@ -1,27 +1,104 @@
-# How to Host on MC Server Share
+# Hosting Guide — RLCraft / Dregora Server
 
-Anyone with a Minecraft Java server folder can use this system to share it
-with friends. The coordinator is already deployed at
-`https://mc-server-share-app.vercel.app`. All you need is the desktop app.
-
----
-
-## Prerequisites (one-time)
-
-| Tool | Purpose | Where to get it |
-|------|---------|----------------|
-| **Node.js 24 LTS** | Run the desktop build tools | https://nodejs.org |
-| **Rust stable (MSVC)** | Compile the desktop app | https://rustup.rs — accept the default MSVC toolchain |
-| **Visual Studio Build Tools 2022** | C++ linker for Rust/Tauri | https://visualstudio.microsoft.com/visual-cpp-build-tools/ — select "Desktop development with C++" |
-| **Java 17+** | Run the Minecraft server | Already installed with Minecraft; or https://adoptium.net |
-| **playit.gg client** | Expose the server to the internet | https://playit.gg/download |
-
-> **Note on Rust:** rustup will offer to install Visual Studio Build Tools
-> automatically. Accept that prompt — it is the easiest path.
+**Share URL:** https://mc-server-share-app.vercel.app/share/XQZPU8  
+**Share code:** `XQZPU8`  
+**Discord command:** `/host`
 
 ---
 
-## First-time setup
+## Getting the app
+
+Download the installer from the [Releases page](https://github.com/nnicholas-c/mc-server-share-app/releases/latest) and run it. No dev tools, no Git, no Rust — just install and open.
+
+> If the Releases page says "no releases" it means the Windows build is still compiling (first build takes ~20 min on GitHub Actions). Check back soon or build from source (see [Contributing](#contributing)).
+
+---
+
+## First time: 3-step setup
+
+1. **Open the app** — it will say "Loading saved settings…"
+2. **Import your server folder** — click **Import Server**, select the folder containing your Minecraft server (e.g. the folder with `forge-…jar` and `server.properties`)
+3. **Enter your display name** — type your name in the Display name box (this is what others see when you're hosting)
+
+The app saves everything automatically. Next time you open it, your folder, name, and share are all pre-loaded.
+
+---
+
+## Hosting (every session)
+
+1. Open the app — it auto-loads the share. If it doesn't, paste `XQZPU8` in the **Share code** field and click **Load Share**.
+2. Click **Download & Host**
+   - Downloads the latest world snapshot from whoever hosted last
+   - Starts the Minecraft server
+   - Starts playit.gg (if you've set the path — see below)
+3. Wait for a `your-address.joinmc.io:PORT` address to appear in the **Logs** panel
+4. Share that address in Discord so your friends can connect in Minecraft
+5. When done playing, click **Stop and Upload** — this saves your world so the next person gets it
+
+**Setting up playit.gg (one-time):**
+- Download the client from https://playit.gg/download
+- In the app, click **Set playit** and select the `playit.exe` file
+- The app remembers the path from then on
+
+---
+
+## Friends: joining and hosting
+
+Anyone can download the installer and be ready to host in under 5 minutes.
+
+**To download and join for the first time:**
+1. Get the installer from [Releases](https://github.com/nnicholas-c/mc-server-share-app/releases/latest)
+2. Open the app and paste the share code `XQZPU8`, or click this link: [Open in MC Server Share](mcservershare://share/XQZPU8?coordinator=https://mc-server-share-app.vercel.app)
+3. Enter your display name
+4. Click **Download & Host** — the app fetches everything (mods, world) and starts the server automatically
+5. Share the playit address in Discord
+
+**Using Discord:**
+- Type `/host` in the server
+- If the server is free, you'll get a link that opens the app directly
+- If someone is already hosting, you'll see their name
+
+---
+
+## Admin tasks (first-time server publish)
+
+This only needs to happen once, or whenever the mods/config change. You need the **admin token** for the share.
+
+1. Open the app, load share `XQZPU8`
+2. Paste the admin token in the **Admin token** field
+3. Click **Publish Server Package**
+   - This uploads all mods, JARs, and configs to Vercel Blob
+   - Friends will download this package the first time they click Download & Host
+   - Large modpacks (1–2 GB) may take a few minutes
+
+> **Keep the admin token safe.** It controls who can publish new server packages. Don't share it publicly.
+
+---
+
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| App shows "Restoring last session…" and hangs | Check internet connection; coordinator might be briefly unavailable |
+| "Could not find server folder" | Make sure you selected the folder that contains `server.properties` |
+| Server starts but crashes immediately | Check the Logs panel for the Java error; confirm Java 17+ is installed |
+| playit shows no address after 60 s | Make sure the playit path is set correctly; try re-clicking Set playit |
+| "Share not found" | Double-check you typed `XQZPU8` exactly; no spaces |
+| Minecraft shows "outdated server" | The server is running a different Minecraft version than your client |
+| Upload fails at Stop and Upload | Rare network error — click Stop and Upload again |
+| World didn't save | If the app crashed without clicking Stop and Upload, the world is local only — the next host won't have your changes |
+
+---
+
+## Contributing / building from source
+
+Only needed if you want to modify the app or the release build isn't available yet.
+
+**Prerequisites:**
+- Node.js 24 LTS — https://nodejs.org
+- Rust stable + Visual Studio Build Tools 2022 with "Desktop development with C++" — run `rustup-init.exe` from https://rustup.rs and accept the prompt to install VS Build Tools
+- Java 17+ for running the Minecraft server
+- playit.gg client — https://playit.gg/download
 
 ```sh
 git clone https://github.com/nnicholas-c/mc-server-share-app.git
@@ -30,79 +107,13 @@ npm install
 ```
 
 Create `apps/desktop/.env.local`:
-
 ```
 VITE_DEFAULT_COORDINATOR_URL="https://mc-server-share-app.vercel.app"
 ```
 
----
-
-## Running the desktop app
-
+Run the app:
 ```sh
 npm run dev --workspace @mc-share/desktop
 ```
 
-This compiles the Rust backend (~3 minutes on first run, fast afterward) and
-opens the MC Server Share window.
-
----
-
-## First-time host: publishing the server package
-
-Do this once when you set up a new share. Everyone who joins later will
-download the package automatically.
-
-1. Click **Import Server** → select your server folder (e.g. `server1.20.4`).
-2. The app auto-detects the server type, port, and start command.
-3. In the **Share** panel, set **Coordinator URL** to
-   `https://mc-server-share-app.vercel.app` (already the default).
-4. Enter a **Display name** (your name) and a **Share name** (e.g. "RLCraft
-   Server").
-5. Click **Create Share**. Copy the share URL — send it to friends.
-6. Paste the admin token somewhere safe (password manager, notes). You need
-   it to publish future server updates.
-7. Click **Publish Server Package** (enter the admin token when prompted).
-   This uploads the mods, configs, and JARs to Vercel Blob (~may take a few
-   minutes for large modpacks).
-
----
-
-## Every time you host
-
-1. Open the app and **Import Server** (or it will remember last time).
-2. In the **Share** panel, paste the share code or link and click **Load
-   Share**.
-3. Click **Download Latest** to get the newest world snapshot from whoever
-   hosted before you.
-4. Set **playit path** to your `playit.exe` location.
-5. Click **Host**. The app starts the Minecraft server and playit.
-6. Share the playit address that appears in the Logs panel with your friends.
-7. When you're done, click **Stop and Upload**. This saves your world to Vercel
-   Blob so the next person picks it up.
-
----
-
-## Joining (no server folder needed)
-
-Friends who aren't hosting only need the desktop app:
-
-1. Install the app (grab the installer from the
-   [Releases page](https://github.com/nnicholas-c/mc-server-share-app/releases/latest)).
-2. Open the share link the host sends — it will deep-link into the app
-   automatically (`mcservershare://...`), or paste the share code manually.
-3. Click **Download Latest** and choose an empty folder to install into.
-4. When it's your turn to host, click **Host**.
-
----
-
-## Troubleshooting
-
-| Problem | Fix |
-|---------|-----|
-| `link.exe not found` when building | Install VS Build Tools 2022 with "Desktop development with C++" |
-| `vite` not found when running | Use `npm run dev --workspace @mc-share/desktop` from the repo root, not inside `apps/desktop` |
-| Server doesn't start | Check the Logs panel; confirm Java is installed and the start command is correct |
-| playit shows no address | Wait ~30 s; check that `playit.exe` path is set correctly in the app |
-| Upload fails | Check that Vercel Blob is connected to the coordinator project and `BLOB_READ_WRITE_TOKEN` is set |
-| Share page shows old world | The previous host may not have clicked Stop and Upload; wait for them or host from your own copy |
+First compile takes ~3 minutes. After that, hot-reload is near-instant.
