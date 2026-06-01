@@ -7,13 +7,15 @@ type Props = {
   desktopDownloadUrl: string;
   shareCode: string;
   shareUrl: string;
+  isHosted: boolean;
 };
 
 export function ShareActions({
   deepLink,
   desktopDownloadUrl,
   shareCode,
-  shareUrl
+  shareUrl,
+  isHosted
 }: Props) {
   const [copied, setCopied] = useState("");
 
@@ -26,7 +28,7 @@ export function ShareActions({
   return (
     <div className="actions">
       <a className="button primary" href={deepLink}>
-        Open In MC Server Share
+        {isHosted ? "Open In MC Server Share" : "Open App to Host"}
       </a>
       <a className="button secondary" href={desktopDownloadUrl}>
         Download App

@@ -9,7 +9,7 @@ use std::{
   sync::Mutex,
   time::{SystemTime, UNIX_EPOCH},
 };
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use walkdir::WalkDir;
 
 #[derive(Default)]
@@ -524,6 +524,46 @@ mod tests {
   }
 }
 
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct SavedConfig {
+  server_path: Option<String>,
+  share_code: Option<String>,
+  coordinator_url: Option<String>,
+  display_name: Option<String>,
+  admin_token: Option<String>,
+  playit_path: Option<String>,
+}
+
+#[tauri::command]
+fn load_config(app: AppHandle) -> Result<SavedConfig, String> {
+  let config_path = app
+    .path()
+    .app_local_data_dir()
+    .map_err(|e| e.to_string())?
+    .join("config.json");
+
+  if !config_path.exists() {
+    return Ok(SavedConfig::default());
+  }
+
+  let text = fs::read_to_string(&config_path).map_err(|e| e.to_string())?;
+  serde_json::from_str(&text).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn save_config(app: AppHandle, config: SavedConfig) -> Result<(), String> {
+  let data_dir = app
+    .path()
+    .app_local_data_dir()
+    .map_err(|e| e.to_string())?;
+
+  fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
+
+  let text = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
+  fs::write(data_dir.join("config.json"), text).map_err(|e| e.to_string())
+}
+
 pub fn run() {
   let mut builder = tauri::Builder::default();
 
@@ -557,7 +597,9 @@ pub fn run() {
       start_minecraft_server,
       stop_minecraft_server,
       start_playit,
-      stop_playit
+      stop_playit,
+      load_config,
+      save_config
     ])
     .run(tauri::generate_context!())
     .expect("error while running MC Server Share");

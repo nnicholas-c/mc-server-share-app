@@ -59,6 +59,7 @@ export default async function SharePage({
             desktopDownloadUrl={desktopDownloadUrl}
             shareCode={manifest.code}
             shareUrl={shareUrl}
+            isHosted={Boolean(manifest.activeSession)}
           />
         </aside>
       </section>

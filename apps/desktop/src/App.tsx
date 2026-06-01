@@ -40,11 +40,18 @@ type ProcessLog = {
   line: string;
 };
 
+type SavedConfig = {
+  serverPath?: string;
+  shareCode?: string;
+  coordinatorUrl?: string;
+  displayName?: string;
+  adminToken?: string;
+  playitPath?: string;
+};
+
 export default function App() {
   const [profile, setProfile] = useState<DesktopProfile>(defaultProfile);
-  const [displayName, setDisplayName] = useState(
-    localStorage.getItem("mc-share-display-name") ?? ""
-  );
+  const [displayName, setDisplayName] = useState("");
   const [shareName, setShareName] = useState("Friends Minecraft World");
   const [shareCode, setShareCode] = useState("");
   const [shareUrl, setShareUrl] = useState("");
@@ -53,7 +60,8 @@ export default function App() {
   const [lock, setLock] = useState<ClaimLockResponse | null>(null);
   const [logs, setLogs] = useState<ProcessLog[]>([]);
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState("Choose a server folder to begin.");
+  const [status, setStatus] = useState("Loading saved settings…");
+  const [configLoaded, setConfigLoaded] = useState(false);
   const heartbeatTimer = useRef<number | null>(null);
 
   const coordinatorUrl = profile.coordinatorUrl ?? "http://localhost:3000";
@@ -96,9 +104,51 @@ export default function App() {
     };
   }, []);
 
+  // Load persisted config once on startup
   useEffect(() => {
-    localStorage.setItem("mc-share-display-name", displayName);
-  }, [displayName]);
+    invoke<SavedConfig>("load_config")
+      .then((config) => {
+        const savedCoordinatorUrl = config.coordinatorUrl ?? defaultCoordinatorUrl;
+        setProfile((current) => ({
+          ...current,
+          serverPath: config.serverPath ?? current.serverPath,
+          coordinatorUrl: savedCoordinatorUrl,
+          playitPath: config.playitPath ?? current.playitPath,
+        }));
+        if (config.displayName) setDisplayName(config.displayName);
+        if (config.adminToken) setAdminToken(config.adminToken);
+        if (config.shareCode) {
+          setShareCode(config.shareCode);
+          setStatus("Restoring last session…");
+          void loadShare(config.shareCode, savedCoordinatorUrl).finally(() =>
+            setConfigLoaded(true)
+          );
+        } else {
+          setStatus("Choose a server folder to begin.");
+          setConfigLoaded(true);
+        }
+      })
+      .catch(() => {
+        setStatus("Choose a server folder to begin.");
+        setConfigLoaded(true);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist config whenever relevant fields change (after initial load)
+  useEffect(() => {
+    if (!configLoaded) return;
+    void invoke("save_config", {
+      config: {
+        serverPath: profile.serverPath || undefined,
+        shareCode: shareCode || undefined,
+        coordinatorUrl: profile.coordinatorUrl,
+        displayName: displayName || undefined,
+        adminToken: adminToken || undefined,
+        playitPath: profile.playitPath ?? undefined,
+      } satisfies SavedConfig,
+    });
+  }, [configLoaded, profile.serverPath, profile.coordinatorUrl, profile.playitPath, shareCode, displayName, adminToken]);
 
   useEffect(() => {
     if (!lock) {
@@ -282,6 +332,71 @@ export default function App() {
       await invoke("start_minecraft_server", { profile });
       if (profile.playitPath) {
         await invoke("start_playit", { playitPath: profile.playitPath });
+      }
+      setStatus("Hosting started. Share the playit address when it appears.");
+    } catch (error) {
+      setStatus(String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDownloadAndHost() {
+    if (!manifest || !canHost) return;
+    setBusy(true);
+    try {
+      // --- download latest ---
+      let serverPath = profile.serverPath;
+      if (!serverPath) {
+        const selected = await open({ directory: true, multiple: false });
+        if (!selected || Array.isArray(selected)) {
+          setStatus("Choose an install folder before hosting.");
+          return;
+        }
+        serverPath = selected;
+        setProfile((current) => ({ ...current, serverPath }));
+      }
+      let restoreProfile = { ...profile, serverPath };
+
+      if (manifest.currentPackage) {
+        setStatus("Downloading server package…");
+        const archive = await invoke<LocalArchive>("download_archive", {
+          url: manifest.currentPackage.url,
+          expectedSha256: manifest.currentPackage.sha256,
+          fileName: `server-${manifest.currentPackage.version}.tar.zst`
+        });
+        await invoke("extract_server_package", { archivePath: archive.path, destination: serverPath });
+        restoreProfile = await invoke<DesktopProfile>("detect_server_folder", { serverPath });
+        setProfile((current) => ({
+          ...restoreProfile,
+          coordinatorUrl: current.coordinatorUrl,
+          shareCode: manifest.code
+        }));
+      }
+
+      if (manifest.latestSnapshot) {
+        setStatus("Downloading world snapshot…");
+        const archive = await invoke<LocalArchive>("download_archive", {
+          url: manifest.latestSnapshot.url,
+          expectedSha256: manifest.latestSnapshot.sha256,
+          fileName: `world-${manifest.latestSnapshot.version}.tar.zst`
+        });
+        await invoke("restore_world_archive", { profile: restoreProfile, archivePath: archive.path });
+      }
+
+      // --- host ---
+      setStatus("Starting server…");
+      const deviceIdHash = await getDeviceIdHash();
+      const nextLock = await claimLock({
+        coordinatorUrl,
+        shareCode: manifest.code,
+        hostDisplayName: displayName,
+        deviceIdHash
+      });
+      setLock(nextLock);
+      await invoke("start_minecraft_server", { profile: restoreProfile });
+      if (restoreProfile.playitPath) {
+        await invoke("start_playit", { playitPath: restoreProfile.playitPath });
       }
       setStatus("Hosting started. Share the playit address when it appears.");
     } catch (error) {
@@ -556,9 +671,14 @@ export default function App() {
             </div>
           </dl>
           {!lock ? (
-            <button disabled={busy || !canHost} onClick={handleHost}>
-              Host
-            </button>
+            <>
+              <button className="primary" disabled={busy || !canHost} onClick={handleDownloadAndHost}>
+                Download &amp; Host
+              </button>
+              <button className="quiet" disabled={busy || !canHost} onClick={handleHost}>
+                Host (skip download)
+              </button>
+            </>
           ) : (
             <button disabled={busy} onClick={handleStopAndUpload}>
               Stop and Upload
