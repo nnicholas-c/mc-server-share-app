@@ -24,8 +24,8 @@ export default function Home() {
           <a className="button primary" href={desktopDownloadUrl}>
             Download App
           </a>
-          <a className="button secondary" href="https://github.com/nnicholas-c/mc-server-share-app">
-            View Source
+          <a className="button secondary" href="https://github.com/nnicholas-c/mc-server-share-app/blob/main/docs/hosting-guide.md">
+            How to Host
           </a>
         </div>
       </section>
