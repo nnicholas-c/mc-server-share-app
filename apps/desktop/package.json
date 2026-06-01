@@ -12,6 +12,7 @@
   "dependencies": {
     "@mc-share/protocol": "file:../../packages/protocol",
     "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-deep-link": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",
     "@tauri-apps/plugin-fs": "^2.0.0",
     "@vercel/blob": "^2.4.0",

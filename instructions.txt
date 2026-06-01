@@ -9,5 +9,16 @@ MC Server Share is now a desktop app plus coordinator API.
 7. In the desktop app, import a Minecraft Java server folder, create or load a
    share, claim the host lock, click Host, then Stop and Upload when finished.
 
+For Vercel:
+
+1. Import `nnicholas-c/mc-server-share-app`.
+2. Set Root Directory to `apps/coordinator`.
+3. Add Neon, Vercel Blob, and the env vars from `apps/coordinator/.env.example`.
+4. Send friends `https://your-coordinator.vercel.app/share/<code>`.
+
+Friends install the desktop app once, click "Open In MC Server Share" from the
+share page, click Download Latest, then Host. The `mcservershare://` deep link
+loads the coordinator URL and share code automatically.
+
 The old `server1.20.4` folder is local-only and ignored by Git. Import it from
 the desktop app if you want to publish the current RLCraft/Dregora server.

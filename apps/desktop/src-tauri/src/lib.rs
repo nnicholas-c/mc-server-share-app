@@ -525,9 +525,26 @@ mod tests {
 }
 
 pub fn run() {
-  tauri::Builder::default()
+  let mut builder = tauri::Builder::default();
+
+  #[cfg(desktop)]
+  {
+    builder = builder.plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}));
+  }
+
+  builder
+    .plugin(tauri_plugin_deep_link::init())
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_fs::init())
+    .setup(|app| {
+      #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
+      {
+        use tauri_plugin_deep_link::DeepLinkExt;
+        app.deep_link().register_all()?;
+      }
+
+      Ok(())
+    })
     .manage(ProcessState::default())
     .invoke_handler(tauri::generate_handler![
       detect_server_folder,

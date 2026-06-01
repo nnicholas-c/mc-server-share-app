@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { open } from "@tauri-apps/plugin-dialog";
 import type {
   ClaimLockResponse,
@@ -18,6 +19,9 @@ import {
 import { getDeviceIdHash } from "./lib/device";
 import { uploadArchive, type LocalArchive } from "./lib/upload";
 
+const defaultCoordinatorUrl =
+  import.meta.env.VITE_DEFAULT_COORDINATOR_URL ?? "http://localhost:3000";
+
 const defaultProfile: DesktopProfile = {
   serverPath: "",
   serverType: "unknown",
@@ -28,7 +32,7 @@ const defaultProfile: DesktopProfile = {
   levelName: "world",
   worldIncludes: ["world"],
   worldExcludes: ["session.lock", "logs", "crash-reports"],
-  coordinatorUrl: "http://localhost:3000"
+  coordinatorUrl: defaultCoordinatorUrl
 };
 
 type ProcessLog = {
@@ -59,6 +63,33 @@ export default function App() {
     const unlisten = listen<ProcessLog>("process-log", (event) => {
       setLogs((current) => [...current.slice(-300), event.payload]);
     });
+
+    return () => {
+      void unlisten.then((dispose) => dispose());
+    };
+  }, []);
+
+  useEffect(() => {
+    function openShareLinks(urls: string[] | null) {
+      const firstShare = urls
+        ?.map(parseShareDeepLink)
+        .find((share): share is DeepLinkedShare => Boolean(share));
+
+      if (!firstShare) {
+        return;
+      }
+
+      setShareCode(firstShare.shareCode);
+      if (firstShare.coordinatorUrl) {
+        setProfile((current) => ({
+          ...current,
+          coordinatorUrl: firstShare.coordinatorUrl
+        }));
+      }
+      void loadShare(firstShare.shareCode, firstShare.coordinatorUrl);
+    }
+
+    const unlisten = onOpenUrl(openShareLinks);
 
     return () => {
       void unlisten.then((dispose) => dispose());
@@ -147,14 +178,26 @@ export default function App() {
   }
 
   async function handleLoadShare() {
+    await loadShare(shareCode);
+  }
+
+  async function loadShare(input: string, coordinatorOverride?: string) {
     setBusy(true);
     try {
-      const nextManifest = await getManifest(coordinatorUrl, normalizeShareCode(shareCode));
+      const nextCoordinatorUrl = coordinatorOverride ?? coordinatorUrl;
+      const nextManifest = await getManifest(
+        nextCoordinatorUrl,
+        normalizeShareCode(input)
+      );
       setManifest(nextManifest);
       setShareCode(nextManifest.code);
-      setShareUrl(`${coordinatorUrl.replace(/\/$/, "")}/share/${nextManifest.code}`);
-      setProfile((current) => ({ ...current, shareCode: nextManifest.code }));
-      setStatus(`Loaded share ${nextManifest.code}.`);
+      setShareUrl(`${nextCoordinatorUrl.replace(/\/$/, "")}/share/${nextManifest.code}`);
+      setProfile((current) => ({
+        ...current,
+        coordinatorUrl: nextCoordinatorUrl,
+        shareCode: nextManifest.code
+      }));
+      setStatus(`Loaded share ${nextManifest.code}. Download latest, then click Host.`);
     } catch (error) {
       setStatus(String(error));
     } finally {
@@ -534,10 +577,40 @@ export default function App() {
   );
 }
 
+type DeepLinkedShare = {
+  shareCode: string;
+  coordinatorUrl?: string;
+};
+
 function normalizeShareCode(value: string) {
   const trimmed = value.trim();
   if (!trimmed.includes("/")) {
     return trimmed;
   }
   return trimmed.split("/").filter(Boolean).at(-1) ?? trimmed;
+}
+
+function parseShareDeepLink(value: string): DeepLinkedShare | null {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "mcservershare:") {
+      return null;
+    }
+
+    const shareCode =
+      url.searchParams.get("code") ??
+      (url.hostname === "share" ? url.pathname.split("/").filter(Boolean)[0] : "") ??
+      "";
+
+    if (!shareCode) {
+      return null;
+    }
+
+    return {
+      shareCode: normalizeShareCode(shareCode),
+      coordinatorUrl: url.searchParams.get("coordinator") ?? undefined
+    };
+  } catch {
+    return null;
+  }
 }

@@ -39,6 +39,10 @@ Copy-Item apps/coordinator/.env.example apps/coordinator/.env.local
 
 Then fill in the Vercel Blob and Neon values.
 
+For hosted sharing, deploy `apps/coordinator` to Vercel and send friends the
+`/share/<code>` URL. The share page has Download App, Open In MC Server Share,
+copy link, and status controls. See [docs/vercel-setup.md](docs/vercel-setup.md).
+
 ## Development
 
 Run the coordinator:
