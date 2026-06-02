@@ -7,7 +7,8 @@ use std::{
   path::{Component, Path, PathBuf},
   process::{Child, Command, Stdio},
   sync::Mutex,
-  time::{SystemTime, UNIX_EPOCH},
+  thread,
+  time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Emitter, Manager, State};
 use walkdir::WalkDir;
@@ -98,11 +99,20 @@ fn create_world_archive(profile: DesktopProfile) -> Result<ArchiveResult, String
   let archive_path = temp_archive_path("world")?;
   create_tar_zst(&root, &archive_path, |path| {
     let relative = path.strip_prefix(&root).unwrap_or(path);
-    let first = relative.components().next().map(|part| part.as_os_str().to_string_lossy().to_string());
+    let first = relative
+      .components()
+      .next()
+      .map(|part| part.as_os_str().to_string_lossy().to_string());
     match first {
       Some(name) => {
-        profile.world_includes.iter().any(|include| include == &name)
-          && !profile.world_excludes.iter().any(|exclude| relative_contains(relative, exclude))
+        profile
+          .world_includes
+          .iter()
+          .any(|include| include == &name)
+          && !profile
+            .world_excludes
+            .iter()
+            .any(|exclude| relative_contains(relative, exclude))
       }
       None => false,
     }
@@ -116,10 +126,16 @@ fn create_server_archive(profile: DesktopProfile) -> Result<ArchiveResult, Strin
   let archive_path = temp_archive_path("server")?;
   create_tar_zst(&root, &archive_path, |path| {
     let relative = path.strip_prefix(&root).unwrap_or(path);
-    let first = relative.components().next().map(|part| part.as_os_str().to_string_lossy().to_string());
+    let first = relative
+      .components()
+      .next()
+      .map(|part| part.as_os_str().to_string_lossy().to_string());
     match first {
       Some(name) => {
-        !profile.world_includes.iter().any(|include| include == &name)
+        !profile
+          .world_includes
+          .iter()
+          .any(|include| include == &name)
           && !matches!(
             name.as_str(),
             "logs"
@@ -137,7 +153,11 @@ fn create_server_archive(profile: DesktopProfile) -> Result<ArchiveResult, Strin
 }
 
 #[tauri::command]
-fn download_archive(url: String, expected_sha256: String, file_name: String) -> Result<ArchiveResult, String> {
+fn download_archive(
+  url: String,
+  expected_sha256: String,
+  file_name: String,
+) -> Result<ArchiveResult, String> {
   let mut response = reqwest::blocking::get(&url).map_err(|error| error.to_string())?;
   if !response.status().is_success() {
     return Err(format!("Download failed with {}", response.status()));
@@ -145,7 +165,9 @@ fn download_archive(url: String, expected_sha256: String, file_name: String) -> 
 
   let path = std::env::temp_dir().join(safe_file_name(&file_name));
   let mut file = File::create(&path).map_err(|error| error.to_string())?;
-  response.copy_to(&mut file).map_err(|error| error.to_string())?;
+  response
+    .copy_to(&mut file)
+    .map_err(|error| error.to_string())?;
 
   let actual = sha256_file(&path)?;
   if actual.to_lowercase() != expected_sha256.to_lowercase() {
@@ -187,7 +209,10 @@ fn start_minecraft_server(
   state: State<'_, ProcessState>,
   profile: DesktopProfile,
 ) -> Result<(), String> {
-  let mut guard = state.minecraft.lock().map_err(|_| "Minecraft process lock failed")?;
+  let mut guard = state
+    .minecraft
+    .lock()
+    .map_err(|_| "Minecraft process lock failed")?;
   if guard.is_some() {
     return Err("Minecraft server is already running".into());
   }
@@ -207,13 +232,37 @@ fn start_minecraft_server(
 }
 
 #[tauri::command]
-fn stop_minecraft_server(state: State<'_, ProcessState>) -> Result<(), String> {
-  let mut guard = state.minecraft.lock().map_err(|_| "Minecraft process lock failed")?;
+fn stop_minecraft_server(app: AppHandle, state: State<'_, ProcessState>) -> Result<(), String> {
+  let mut guard = state
+    .minecraft
+    .lock()
+    .map_err(|_| "Minecraft process lock failed")?;
   if let Some(child) = guard.as_mut() {
     if let Some(stdin) = child.stdin.as_mut() {
-      stdin.write_all(b"save-all\nstop\n").map_err(|error| error.to_string())?;
+      stdin
+        .write_all(b"save-all flush\r\nstop\r\n")
+        .map_err(|error| error.to_string())?;
     }
-    child.wait().map_err(|error| error.to_string())?;
+
+    for _ in 0..45 {
+      if child
+        .try_wait()
+        .map_err(|error| error.to_string())?
+        .is_some()
+      {
+        *guard = None;
+        return Ok(());
+      }
+      thread::sleep(Duration::from_secs(1));
+    }
+
+    emit_process_log(
+      &app,
+      "minecraft",
+      "Minecraft did not exit after 45 seconds; forcing it closed after save-all.",
+    );
+    child.kill().map_err(|error| error.to_string())?;
+    let _ = child.wait();
   }
   *guard = None;
   Ok(())
@@ -225,12 +274,17 @@ fn start_playit(
   state: State<'_, ProcessState>,
   playit_path: String,
 ) -> Result<(), String> {
-  let mut guard = state.playit.lock().map_err(|_| "playit process lock failed")?;
+  let mut guard = state
+    .playit
+    .lock()
+    .map_err(|_| "playit process lock failed")?;
   if guard.is_some() {
     return Err("playit is already running".into());
   }
 
   let mut child = Command::new(playit_path)
+    .arg("attach")
+    .arg("--stdout")
     .stdout(Stdio::piped())
     .stderr(Stdio::piped())
     .spawn()
@@ -244,7 +298,10 @@ fn start_playit(
 
 #[tauri::command]
 fn stop_playit(state: State<'_, ProcessState>) -> Result<(), String> {
-  let mut guard = state.playit.lock().map_err(|_| "playit process lock failed")?;
+  let mut guard = state
+    .playit
+    .lock()
+    .map_err(|_| "playit process lock failed")?;
   if let Some(child) = guard.as_mut() {
     let _ = child.kill();
     let _ = child.wait();
@@ -331,7 +388,11 @@ where
   let mut builder = tar::Builder::new(encoder.auto_finish());
   let mut added = false;
 
-  for entry in WalkDir::new(root).min_depth(1).into_iter().filter_map(Result::ok) {
+  for entry in WalkDir::new(root)
+    .min_depth(1)
+    .into_iter()
+    .filter_map(Result::ok)
+  {
     let path = entry.path();
     if !include(path) {
       continue;
@@ -360,7 +421,10 @@ fn extract_tar_zst(archive_path: &Path, destination: &Path) -> Result<(), String
 
   for entry in archive.entries().map_err(|error| error.to_string())? {
     let mut entry = entry.map_err(|error| error.to_string())?;
-    let relative = entry.path().map_err(|error| error.to_string())?.into_owned();
+    let relative = entry
+      .path()
+      .map_err(|error| error.to_string())?
+      .into_owned();
     if !is_safe_relative_path(&relative) {
       return Err("Archive contains an unsafe path".into());
     }
@@ -378,7 +442,9 @@ fn archive_result(path: PathBuf) -> Result<ArchiveResult, String> {
     .ok_or("Archive path has no file name")?
     .to_string_lossy()
     .to_string();
-  let size = fs::metadata(&path).map_err(|error| error.to_string())?.len();
+  let size = fs::metadata(&path)
+    .map_err(|error| error.to_string())?
+    .len();
   let sha256 = sha256_file(&path)?;
 
   Ok(ArchiveResult {
@@ -422,15 +488,19 @@ fn pipe_logs<R: Read + Send + 'static>(app: &AppHandle, process: &str, reader: O
   std::thread::spawn(move || {
     let reader = BufReader::new(reader);
     for line in reader.lines().map_while(Result::ok) {
-      let _ = app.emit(
-        "process-log",
-        ProcessLog {
-          process: process.clone(),
-          line,
-        },
-      );
+      emit_process_log(&app, &process, &line);
     }
   });
+}
+
+fn emit_process_log(app: &AppHandle, process: &str, line: &str) {
+  let _ = app.emit(
+    "process-log",
+    ProcessLog {
+      process: process.to_string(),
+      line: line.to_string(),
+    },
+  );
 }
 
 fn shell_command(command: &str) -> Command {
@@ -450,8 +520,11 @@ fn shell_command(command: &str) -> Command {
 }
 
 fn relative_contains(path: &Path, needle: &str) -> bool {
-  path.components()
-    .any(|part| part.as_os_str().to_string_lossy().eq_ignore_ascii_case(needle))
+  path.components().any(|part| {
+    part.as_os_str()
+      .to_string_lossy()
+      .eq_ignore_ascii_case(needle)
+  })
 }
 
 fn safe_file_name(file_name: &str) -> String {
@@ -465,9 +538,8 @@ fn safe_file_name(file_name: &str) -> String {
 }
 
 fn is_safe_relative_path(path: &Path) -> bool {
-  path.components().all(|component| {
-    matches!(component, Component::Normal(_) | Component::CurDir)
-  })
+  path.components()
+    .all(|component| matches!(component, Component::Normal(_) | Component::CurDir))
 }
 
 fn timestamp() -> u64 {
@@ -504,7 +576,10 @@ mod tests {
     fs::create_dir_all(root.join("world_nether")).unwrap();
 
     let includes = default_world_includes(&root, "world");
-    assert_eq!(includes, vec!["world".to_string(), "world_nether".to_string()]);
+    assert_eq!(
+      includes,
+      vec!["world".to_string(), "world_nether".to_string()]
+    );
     let _ = fs::remove_dir_all(root);
   }
 
@@ -553,10 +628,7 @@ fn load_config(app: AppHandle) -> Result<SavedConfig, String> {
 
 #[tauri::command]
 fn save_config(app: AppHandle, config: SavedConfig) -> Result<(), String> {
-  let data_dir = app
-    .path()
-    .app_local_data_dir()
-    .map_err(|e| e.to_string())?;
+  let data_dir = app.path().app_local_data_dir().map_err(|e| e.to_string())?;
 
   fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
 

@@ -35,6 +35,11 @@ const defaultProfile: DesktopProfile = {
   coordinatorUrl: defaultCoordinatorUrl
 };
 
+const joinAddressPatterns = [
+  /\b(?:[a-z0-9-]+\.)+(?:joinmc\.(?:link|io)|ply\.gg|playit\.gg)(?::\d+)?\b/i,
+  /\b(?!(?:localhost|127\.0\.0\.1|0\.0\.0\.0)\b)(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d+)\b/i
+];
+
 type ProcessLog = {
   process: "minecraft" | "playit";
   line: string;
@@ -177,10 +182,18 @@ export default function App() {
   }, [coordinatorUrl, lock]);
 
   const joinAddress = useMemo(() => {
-    const line = [...logs]
-      .reverse()
-      .find((entry) => entry.process === "playit" && /[a-z0-9.-]+:\d+/i.test(entry.line));
-    return line?.line.match(/[a-z0-9.-]+:\d+/i)?.[0] ?? "";
+    for (const entry of [...logs].reverse()) {
+      if (entry.process !== "playit") {
+        continue;
+      }
+      for (const pattern of joinAddressPatterns) {
+        const match = entry.line.match(pattern);
+        if (match) {
+          return match[0];
+        }
+      }
+    }
+    return "";
   }, [logs]);
 
   async function chooseServerFolder() {
@@ -262,6 +275,11 @@ export default function App() {
     }
     setBusy(true);
     try {
+      if (!manifest.currentPackage && !manifest.latestSnapshot) {
+        setStatus("This share has no published server package or world snapshot yet.");
+        return;
+      }
+
       let serverPath = profile.serverPath;
       if (!serverPath) {
         const selected = await open({ directory: true, multiple: false });
@@ -332,8 +350,10 @@ export default function App() {
       await invoke("start_minecraft_server", { profile });
       if (profile.playitPath) {
         await invoke("start_playit", { playitPath: profile.playitPath });
+        setStatus("Hosting started. Waiting for the playit join address.");
+      } else {
+        setStatus("Hosting started locally. Set playit to get a public join address.");
       }
-      setStatus("Hosting started. Share the playit address when it appears.");
     } catch (error) {
       setStatus(String(error));
     } finally {
@@ -342,11 +362,16 @@ export default function App() {
   }
 
   async function handleDownloadAndHost() {
-    if (!manifest || !canHost) return;
+    if (!manifest || !displayName) return;
     setBusy(true);
     try {
       // --- download latest ---
       let serverPath = profile.serverPath;
+      if (!serverPath && !manifest.currentPackage) {
+        setStatus("This share has no server package yet. Publish a server package before friends can host.");
+        return;
+      }
+
       if (!serverPath) {
         const selected = await open({ directory: true, multiple: false });
         if (!selected || Array.isArray(selected)) {
@@ -399,8 +424,10 @@ export default function App() {
       await invoke("start_minecraft_server", { profile: restoreProfile });
       if (restoreProfile.playitPath) {
         await invoke("start_playit", { playitPath: restoreProfile.playitPath });
+        setStatus("Hosting started. Waiting for the playit join address.");
+      } else {
+        setStatus("Hosting started locally. Set playit to get a public join address.");
       }
-      setStatus("Hosting started. Share the playit address when it appears.");
     } catch (error) {
       setStatus(String(error));
     } finally {
@@ -415,9 +442,13 @@ export default function App() {
 
     setBusy(true);
     try {
+      setStatus("Stopping Minecraft server and saving world...");
       await invoke("stop_minecraft_server");
+      setStatus("Stopping playit...");
       await invoke("stop_playit");
+      setStatus("Creating world archive...");
       const archive = await invoke<LocalArchive>("create_world_archive", { profile });
+      setStatus("Uploading world archive...");
       const blob = await uploadArchive({
         archive,
         coordinatorUrl,
@@ -433,6 +464,7 @@ export default function App() {
         }
       });
 
+      setStatus("Finalizing uploaded world snapshot...");
       await completeSession({
         coordinatorUrl,
         sessionId: lock.session.id,
@@ -648,7 +680,7 @@ export default function App() {
             Share link
             <input value={shareUrl} readOnly />
           </label>
-          <button disabled={busy || !manifest || !profile.serverPath} onClick={handleDownloadLatest}>
+          <button disabled={busy || !manifest} onClick={handleDownloadLatest}>
             Download Latest
           </button>
           <button disabled={busy || !manifest || !adminToken} onClick={handlePublishPackage}>
@@ -672,6 +704,11 @@ export default function App() {
               <dd>{joinAddress || "Waiting for playit"}</dd>
             </div>
           </dl>
+          {!joinAddress && lock ? (
+            <p className="hint">
+              If this stays here, check the Logs section for playit output and make sure playit has a Minecraft tunnel to port {profile.serverPort}.
+            </p>
+          ) : null}
           {!lock ? (
             <>
               <button className="primary" disabled={busy || !canDownloadAndHost} onClick={handleDownloadAndHost}>
