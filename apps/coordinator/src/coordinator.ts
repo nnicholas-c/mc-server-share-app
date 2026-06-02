@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { issueSignedToken, presignUrl } from "@vercel/blob";
 import {
   ClaimLockRequestSchema,
   CompleteSessionRequestSchema,
+  CreateDownloadUrlRequestSchema,
   CreateShareRequestSchema,
   LOCK_TTL_SECONDS,
   PROTOCOL_VERSION,
@@ -10,6 +12,7 @@ import {
   UploadClientPayloadSchema,
   type ClaimLockRequest,
   type CompleteSessionRequest,
+  type CreateDownloadUrlRequest,
   type CreateShareRequest,
   type PublishPackageRequest,
   type UploadClientPayload
@@ -79,6 +82,39 @@ export class CoordinatorService {
     ]);
 
     return toManifest({ share, currentPackage, latestSnapshot, activeSession });
+  }
+
+  async createDownloadUrl(code: string, input: CreateDownloadUrlRequest) {
+    const request = CreateDownloadUrlRequestSchema.parse(input);
+    const share = await this.requireShare(code);
+    const [currentPackage, latestSnapshot] = await Promise.all([
+      this.repository.getCurrentServerPackage(share.id),
+      this.repository.getLatestWorldSnapshot(share.id)
+    ]);
+    const allowedUrls = [currentPackage?.url, latestSnapshot?.url].filter(Boolean);
+
+    if (!allowedUrls.includes(request.blobUrl)) {
+      throw notFound("Download not found for this share");
+    }
+
+    const pathname = blobPathname(request.blobUrl);
+    const validUntil = Date.now() + 60 * 60 * 1000;
+    const signedToken = await issueSignedToken({
+      pathname,
+      operations: ["get"],
+      validUntil
+    });
+    const { presignedUrl } = await presignUrl(signedToken, {
+      operation: "get",
+      pathname,
+      access: "private",
+      validUntil
+    });
+
+    return {
+      url: presignedUrl,
+      expiresAt: new Date(validUntil).toISOString()
+    };
   }
 
   async claimHostLock(code: string, input: ClaimLockRequest) {
@@ -306,4 +342,12 @@ export class CoordinatorService {
 
 function addSeconds(date: Date, seconds: number) {
   return new Date(date.getTime() + seconds * 1000);
+}
+
+function blobPathname(blobUrl: string) {
+  const pathname = new URL(blobUrl).pathname.replace(/^\/+/, "");
+  if (!pathname) {
+    throw badRequest("Blob URL does not contain a pathname");
+  }
+  return pathname;
 }

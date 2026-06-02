@@ -1,6 +1,7 @@
 import type {
   ClaimLockResponse,
   CompleteSessionRequest,
+  CreateDownloadUrlResponse,
   CreateShareResponse,
   DesktopProfile,
   PublishPackageRequest,
@@ -93,4 +94,19 @@ export function publishPackage(input: {
     method: "POST",
     body: JSON.stringify(input.request)
   });
+}
+
+export function createDownloadUrl(input: {
+  coordinatorUrl: string;
+  shareCode: string;
+  blobUrl: string;
+}) {
+  return request<CreateDownloadUrlResponse>(
+    input.coordinatorUrl,
+    `/api/shares/${input.shareCode}/download-url`,
+    {
+      method: "POST",
+      body: JSON.stringify({ blobUrl: input.blobUrl })
+    }
+  );
 }

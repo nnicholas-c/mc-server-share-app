@@ -11,6 +11,7 @@ import type {
 import {
   claimLock,
   completeSession,
+  createDownloadUrl,
   createShare,
   getManifest,
   heartbeat,
@@ -84,6 +85,26 @@ async function retryUploadFinalization<T>(
   }
 
   throw lastError;
+}
+
+async function downloadShareArchive(input: {
+  coordinatorUrl: string;
+  shareCode: string;
+  blobUrl: string;
+  expectedSha256: string;
+  fileName: string;
+}) {
+  const signed = await createDownloadUrl({
+    coordinatorUrl: input.coordinatorUrl,
+    shareCode: input.shareCode,
+    blobUrl: input.blobUrl
+  });
+
+  return invoke<LocalArchive>("download_archive", {
+    url: signed.url,
+    expectedSha256: input.expectedSha256,
+    fileName: input.fileName
+  });
 }
 
 type ProcessLog = {
@@ -359,8 +380,10 @@ export default function App() {
       let restoreProfile = { ...profile, serverPath };
 
       if (manifest.currentPackage) {
-        const archive = await invoke<LocalArchive>("download_archive", {
-          url: manifest.currentPackage.url,
+        const archive = await downloadShareArchive({
+          coordinatorUrl,
+          shareCode: manifest.code,
+          blobUrl: manifest.currentPackage.url,
           expectedSha256: manifest.currentPackage.sha256,
           fileName: `server-${manifest.currentPackage.version}.tar.zst`
         });
@@ -378,8 +401,10 @@ export default function App() {
       }
 
       if (manifest.latestSnapshot) {
-        const archive = await invoke<LocalArchive>("download_archive", {
-          url: manifest.latestSnapshot.url,
+        const archive = await downloadShareArchive({
+          coordinatorUrl,
+          shareCode: manifest.code,
+          blobUrl: manifest.latestSnapshot.url,
           expectedSha256: manifest.latestSnapshot.sha256,
           fileName: `world-${manifest.latestSnapshot.version}.tar.zst`
         });
@@ -451,8 +476,10 @@ export default function App() {
 
       if (manifest.currentPackage) {
         setStatus("Downloading server package…");
-        const archive = await invoke<LocalArchive>("download_archive", {
-          url: manifest.currentPackage.url,
+        const archive = await downloadShareArchive({
+          coordinatorUrl,
+          shareCode: manifest.code,
+          blobUrl: manifest.currentPackage.url,
           expectedSha256: manifest.currentPackage.sha256,
           fileName: `server-${manifest.currentPackage.version}.tar.zst`
         });
@@ -469,8 +496,10 @@ export default function App() {
 
       if (manifest.latestSnapshot) {
         setStatus("Downloading world snapshot…");
-        const archive = await invoke<LocalArchive>("download_archive", {
-          url: manifest.latestSnapshot.url,
+        const archive = await downloadShareArchive({
+          coordinatorUrl,
+          shareCode: manifest.code,
+          blobUrl: manifest.latestSnapshot.url,
           expectedSha256: manifest.latestSnapshot.sha256,
           fileName: `world-${manifest.latestSnapshot.version}.tar.zst`
         });

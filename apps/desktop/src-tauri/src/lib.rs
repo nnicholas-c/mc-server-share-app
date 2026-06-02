@@ -259,7 +259,7 @@ fn upload_archive(
   let response = client
     .put(blob_url)
     .header("authorization", format!("Bearer {}", token_response.client_token))
-    .header("x-vercel-blob-access", "public")
+    .header("x-vercel-blob-access", "private")
     .header("x-content-type", content_type)
     .header("x-vercel-blob-store-id", store_id)
     .header("x-api-version", "12")

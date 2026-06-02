@@ -144,3 +144,18 @@ export const PublishPackageRequestSchema = z.object({
   archiveFormat: ArchiveFormatSchema
 });
 export type PublishPackageRequest = z.infer<typeof PublishPackageRequestSchema>;
+
+export const CreateDownloadUrlRequestSchema = z.object({
+  blobUrl: z.string().url()
+});
+export type CreateDownloadUrlRequest = z.infer<
+  typeof CreateDownloadUrlRequestSchema
+>;
+
+export const CreateDownloadUrlResponseSchema = z.object({
+  url: z.string().url(),
+  expiresAt: z.string().datetime()
+});
+export type CreateDownloadUrlResponse = z.infer<
+  typeof CreateDownloadUrlResponseSchema
+>;
