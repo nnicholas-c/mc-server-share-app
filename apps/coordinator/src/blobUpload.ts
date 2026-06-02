@@ -16,7 +16,7 @@ export async function handleBlobUploadRequest(request: Request) {
   const body = await request.json();
   const coordinator = getCoordinator();
 
-  return handleUpload({
+  const result = await handleUpload({
     body,
     request,
     onBeforeGenerateToken: async (_pathname, clientPayload) => {
@@ -50,4 +50,6 @@ export async function handleBlobUploadRequest(request: Request) {
       });
     }
   });
+
+  return Response.json(result);
 }
