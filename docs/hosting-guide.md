@@ -1,119 +1,111 @@
-# Hosting Guide — RLCraft / Dregora Server
+# MC Server Share Hosting Guide
 
-**Share URL:** https://mc-server-share-app.vercel.app/share/XQZPU8  
-**Share code:** `XQZPU8`  
-**Discord command:** `/host`
+This guide is the short version you can send to friends who need to host the Minecraft server.
 
----
+- **Website:** https://mc-server-share-app.vercel.app
+- **Latest app download:** https://github.com/nnicholas-c/mc-server-share-app/releases/latest
+- **Example share page:** https://mc-server-share-app.vercel.app/share/8UQLLQ
+- **Example share code:** `8UQLLQ`
 
-## Getting the app
+Use the share code or share page your group gives you. The `8UQLLQ` code is the current test share from setup.
 
-Download the installer from the [Releases page](https://github.com/nnicholas-c/mc-server-share-app/releases/latest) and run it. No dev tools, no Git, no Rust — just install and open.
+## Friends: Hosting For The First Time
 
-> If the Releases page says "no releases" it means the Windows build is still compiling (first build takes ~20 min on GitHub Actions). Check back soon or build from source (see [Contributing](#contributing)).
+1. Download MC Server Share from https://github.com/nnicholas-c/mc-server-share-app/releases/latest.
+2. Install and open the app.
+3. Enter your display name.
+4. Paste the share code, such as `8UQLLQ`.
+5. Click **Load Share**.
+6. Download playit.gg from https://playit.gg/download.
+7. Run playit once and verify/login if prompted.
+8. In the playit dashboard, create a **Minecraft Java** tunnel to `127.0.0.1:25565`.
+9. In MC Server Share, click **Set playit** and select the playit executable.
+10. Click **Download & Host**.
+11. Wait for the playit join address.
+12. Share the join address with everyone.
+13. When done, click **Stop and Upload**.
 
----
+You do not need the admin token to host. You only need the share code and a working playit tunnel.
 
-## First time: 3-step setup
+## Friends: Hosting From The Website
 
-1. **Open the app** — it will say "Loading saved settings…"
-2. **Import your server folder** — click **Import Server**, select the folder containing your Minecraft server (e.g. the folder with `forge-…jar` and `server.properties`)
-3. **Enter your display name** — type your name in the Display name box (this is what others see when you're hosting)
+1. Open the share page, for example https://mc-server-share-app.vercel.app/share/8UQLLQ.
+2. Click **Download App** if MC Server Share is not installed yet.
+3. Click **Open App to Host**.
+4. Confirm the share is loaded in the app.
+5. Click **Download & Host**.
+6. Share the playit address when it appears.
+7. Click **Stop and Upload** at the end of the session.
 
-The app saves everything automatically. Next time you open it, your folder, name, and share are all pre-loaded.
+## What Each Button Means
 
----
+| Button | Who uses it | What it does |
+| --- | --- | --- |
+| **Load Share** | Everyone | Loads the share code and checks current status. |
+| **Download & Host** | Current host | Downloads the latest files, starts Minecraft, starts playit, and locks the share. |
+| **Stop and Upload** | Current host | Saves the world, stops hosting, uploads the latest snapshot, and releases the host lock. |
+| **Publish Server Package** | Admin only | Uploads server JARs, mods, configs, and scripts after setup or mod changes. |
+| **Set playit** | Anyone who hosts | Points the app to the playit executable. |
 
-## Hosting (every session)
+## Admin: Publishing The Server Package
 
-1. Open the app — it auto-loads the share. If it doesn't, paste `XQZPU8` in the **Share code** field and click **Load Share**.
-2. Click **Download & Host**
-   - Downloads the latest world snapshot from whoever hosted last
-   - Starts the Minecraft server
-   - Starts playit.gg (if you've set the path — see below)
-3. Wait for a `your-address.joinmc.io:PORT` address to appear in the **Logs** panel
-4. Share that address in Discord so your friends can connect in Minecraft
-5. When done playing, click **Stop and Upload** — this saves your world so the next person gets it
+The admin token is only for the person managing the server files. Friends should not need it.
 
-**Setting up playit.gg (one-time):**
-- Download the client from https://playit.gg/download
-- In the app, click **Set playit** and select the `playit.exe` file
-- The app remembers the path from then on
+1. Open MC Server Share.
+2. Click **Import Server** and select the Minecraft server folder.
+3. Create or load the share.
+4. Paste the admin token into **Admin token**.
+5. Click **Publish Server Package**.
 
----
+Publish again only when server-side files change, such as mods, configs, scripts, or the server JAR. Normal world progress uploads automatically through **Stop and Upload**.
 
-## Friends: joining and hosting
+## playit.gg Setup
 
-Anyone can download the installer and be ready to host in under 5 minutes.
+MC Server Share runs the playit agent, but playit.gg still needs a tunnel configured.
 
-**To download and join for the first time:**
-1. Get the installer from [Releases](https://github.com/nnicholas-c/mc-server-share-app/releases/latest)
-2. Open the app and paste the share code `XQZPU8`, or click this link: [Open in MC Server Share](mcservershare://share/XQZPU8?coordinator=https://mc-server-share-app.vercel.app)
-3. Enter your display name
-4. Click **Download & Host** — the app fetches everything (mods, world) and starts the server automatically
-5. Share the playit address in Discord
+1. Go to https://playit.gg.
+2. Open your agent.
+3. Add a tunnel.
+4. Choose **Minecraft Java**.
+5. Set the local address to `127.0.0.1`.
+6. Set the local port to `25565`.
+7. Save it.
 
-**Using Discord:**
-- Type `/host` in the server
-- If the server is free, you'll get a link that opens the app directly
-- If someone is already hosting, you'll see their name
+If playit says **No tunnels configured**, add the tunnel above. If it shows an address like `q-davidson.gl.joinmc.link`, that is the Minecraft address friends use while the server is running.
 
----
+## Why China Or Overseas Players May Lag
 
-## Admin tasks (first-time server publish)
+The website and GitHub release do not carry live gameplay. Live Minecraft traffic goes through playit.gg from each player to the host's computer. A player in China may lag because the current host is far away, because China cross-border routing is slow, because the playit tunnel is routed through a distant datacenter, or because the host's home upload/Wi-Fi is overloaded.
 
-This only needs to happen once, or whenever the mods/config change. You need the **admin token** for the share.
+Best fixes:
 
-1. Open the app, load share `XQZPU8`
-2. Paste the admin token in the **Admin token** field
-3. Click **Publish Server Package**
-   - This uploads all mods, JARs, and configs to Vercel Blob
-   - Friends will download this package the first time they click Download & Host
-   - Large modpacks (1–2 GB) may take a few minutes
-
-> **Keep the admin token safe.** It controls who can publish new server packages. Don't share it publicly.
-
----
+1. Let the friend closest to China host with **Download & Host**.
+2. In playit, test regional tunnels. Try the region closest to the host and test an Asia regional tunnel for China-side players if available.
+3. Use wired Ethernet on the host computer.
+4. Lower `view-distance` and `simulation-distance` in `server.properties` to `4` to `6`.
+5. Avoid streaming, uploads, or downloads on the host network while playing.
+6. Pre-generate chunks for heavy modpacks.
+7. For the best result, host from a computer or VPS closer to China, such as Hong Kong, Singapore, Japan, or mainland China if accessible.
 
 ## Troubleshooting
 
 | Problem | Fix |
-|---------|-----|
-| App shows "Restoring last session…" and hangs | Check internet connection; coordinator might be briefly unavailable |
-| "Could not find server folder" | Make sure you selected the folder that contains `server.properties` |
-| Server starts but crashes immediately | Check the Logs panel for the Java error; confirm Java 17+ is installed |
-| playit shows no address after 60 s | Make sure the playit path is set correctly; try re-clicking Set playit |
-| "Share not found" | Double-check you typed `XQZPU8` exactly; no spaces |
-| Minecraft shows "outdated server" | The server is running a different Minecraft version than your client |
-| Upload fails at Stop and Upload | Rare network error — click Stop and Upload again |
-| World didn't save | If the app crashed without clicking Stop and Upload, the world is local only — the next host won't have your changes |
+| --- | --- |
+| Share says no server package | The admin must click **Publish Server Package** first. |
+| playit has no address | Create a Minecraft Java tunnel to `127.0.0.1:25565`. |
+| Friends cannot connect | Use the exact playit address and keep MC Server Share running. |
+| Minecraft says outdated client/server | Use the same Minecraft and modpack version as the server. |
+| The world did not save | The previous host probably did not click **Stop and Upload**. |
+| Upload fails | Click **Stop and Upload** again. |
+| China player has high ping | Move hosting closer to China, test playit regional tunnels, lower view distance, and use wired internet. |
 
----
+## Building From Source
 
-## Contributing / building from source
-
-Only needed if you want to modify the app or the release build isn't available yet.
-
-**Prerequisites:**
-- Node.js 24 LTS — https://nodejs.org
-- Rust stable + Visual Studio Build Tools 2022 with "Desktop development with C++" — run `rustup-init.exe` from https://rustup.rs and accept the prompt to install VS Build Tools
-- Java 17+ for running the Minecraft server
-- playit.gg client — https://playit.gg/download
+Only developers need this.
 
 ```sh
 git clone https://github.com/nnicholas-c/mc-server-share-app.git
 cd mc-server-share-app
 npm install
-```
-
-Create `apps/desktop/.env.local`:
-```
-VITE_DEFAULT_COORDINATOR_URL="https://mc-server-share-app.vercel.app"
-```
-
-Run the app:
-```sh
 npm run dev --workspace @mc-share/desktop
 ```
-
-First compile takes ~3 minutes. After that, hot-reload is near-instant.

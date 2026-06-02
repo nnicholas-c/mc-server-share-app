@@ -68,9 +68,11 @@ export default async function SharePage({
         <div className="steps">
           <h2>Fastest Way To Host</h2>
           <ol>
-            <li>Install MC Server Share and the playit.gg client once.</li>
+            <li>Install MC Server Share from GitHub Releases.</li>
+            <li>Install playit.gg and create a Minecraft Java tunnel to 127.0.0.1:25565.</li>
             <li>Click Open In MC Server Share from this page.</li>
-            <li>In the app, click Download Latest, then Host.</li>
+            <li>In the app, click Download &amp; Host.</li>
+            <li>Share the playit join address when it appears.</li>
             <li>When finished, click Stop and Upload so the next person gets your world.</li>
           </ol>
         </div>
