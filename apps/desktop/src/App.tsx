@@ -17,7 +17,7 @@ import {
   publishPackage
 } from "./lib/api";
 import { getDeviceIdHash } from "./lib/device";
-import { uploadArchive, type LocalArchive } from "./lib/upload";
+import { uploadArchive, type LocalArchive, type UploadProgress } from "./lib/upload";
 
 const defaultCoordinatorUrl =
   import.meta.env.VITE_DEFAULT_COORDINATOR_URL ?? "http://localhost:3000";
@@ -39,6 +39,23 @@ const joinAddressPatterns = [
   /\b(?:[a-z0-9-]+\.)+(?:joinmc\.(?:link|io)|ply\.gg|playit\.gg)(?::\d+)?\b/i,
   /\b(?!(?:localhost|127\.0\.0\.1|0\.0\.0\.0)\b)(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d+)\b/i
 ];
+
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 B";
+  }
+
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
 
 type ProcessLog = {
   process: "minecraft" | "playit";
@@ -72,6 +89,26 @@ export default function App() {
   const coordinatorUrl = profile.coordinatorUrl ?? "http://localhost:3000";
   const canHost = Boolean(profile.serverPath && manifest && displayName);
   const canDownloadAndHost = Boolean(manifest && displayName);
+
+  function createUploadProgressStatus(label: string) {
+    let lastPercent = -1;
+
+    return (progress: UploadProgress) => {
+      const percent = Math.max(
+        0,
+        Math.min(100, Math.round(progress.percentage))
+      );
+
+      if (percent !== lastPercent) {
+        lastPercent = percent;
+        setStatus(
+          `${label} ${percent}% (${formatBytes(progress.loaded)} of ${formatBytes(
+            progress.total
+          )})...`
+        );
+      }
+    };
+  }
 
   useEffect(() => {
     const unlisten = listen<ProcessLog>("process-log", (event) => {
@@ -448,7 +485,7 @@ export default function App() {
       await invoke("stop_playit");
       setStatus("Creating world archive...");
       const archive = await invoke<LocalArchive>("create_world_archive", { profile });
-      setStatus("Uploading world archive...");
+      setStatus(`Reading world archive (${formatBytes(archive.size)})...`);
       const blob = await uploadArchive({
         archive,
         coordinatorUrl,
@@ -461,7 +498,8 @@ export default function App() {
           expectedSha256: archive.sha256,
           size: archive.size,
           archiveFormat: archive.archiveFormat
-        }
+        },
+        onUploadProgress: createUploadProgressStatus("Uploading world archive")
       });
 
       setStatus("Finalizing uploaded world snapshot...");
@@ -496,7 +534,9 @@ export default function App() {
 
     setBusy(true);
     try {
+      setStatus("Creating server package archive...");
       const archive = await invoke<LocalArchive>("create_server_archive", { profile });
+      setStatus(`Reading server package (${formatBytes(archive.size)})...`);
       const blob = await uploadArchive({
         archive,
         coordinatorUrl,
@@ -508,9 +548,11 @@ export default function App() {
           expectedSha256: archive.sha256,
           size: archive.size,
           archiveFormat: archive.archiveFormat
-        }
+        },
+        onUploadProgress: createUploadProgressStatus("Uploading server package")
       });
 
+      setStatus("Finalizing server package...");
       await publishPackage({
         coordinatorUrl,
         shareCode: manifest.code,
