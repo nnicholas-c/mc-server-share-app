@@ -66,6 +66,7 @@ export default function App() {
 
   const coordinatorUrl = profile.coordinatorUrl ?? "http://localhost:3000";
   const canHost = Boolean(profile.serverPath && manifest && displayName);
+  const canDownloadAndHost = Boolean(manifest && displayName);
 
   useEffect(() => {
     const unlisten = listen<ProcessLog>("process-log", (event) => {
@@ -283,9 +284,8 @@ export default function App() {
           archivePath: archive.path,
           destination: serverPath
         });
-        restoreProfile = await invoke<DesktopProfile>("detect_server_folder", {
-          serverPath
-        });
+        const detected = await invoke<DesktopProfile>("detect_server_folder", { serverPath });
+        restoreProfile = { ...detected, playitPath: profile.playitPath };
         setProfile((current) => ({
           ...restoreProfile,
           coordinatorUrl: current.coordinatorUrl,
@@ -366,7 +366,9 @@ export default function App() {
           fileName: `server-${manifest.currentPackage.version}.tar.zst`
         });
         await invoke("extract_server_package", { archivePath: archive.path, destination: serverPath });
-        restoreProfile = await invoke<DesktopProfile>("detect_server_folder", { serverPath });
+        const detected = await invoke<DesktopProfile>("detect_server_folder", { serverPath });
+        // Preserve playitPath — detect_server_folder always returns null for it
+        restoreProfile = { ...detected, playitPath: profile.playitPath };
         setProfile((current) => ({
           ...restoreProfile,
           coordinatorUrl: current.coordinatorUrl,
@@ -672,7 +674,7 @@ export default function App() {
           </dl>
           {!lock ? (
             <>
-              <button className="primary" disabled={busy || !canHost} onClick={handleDownloadAndHost}>
+              <button className="primary" disabled={busy || !canDownloadAndHost} onClick={handleDownloadAndHost}>
                 Download &amp; Host
               </button>
               <button className="quiet" disabled={busy || !canHost} onClick={handleHost}>
