@@ -8,6 +8,14 @@
     "core:event:default",
     "deep-link:default",
     "dialog:default",
-    "fs:default"
+    "fs:default",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        { "path": "$TEMP/**" },
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$HOME/**" }
+      ]
+    }
   ]
 }
