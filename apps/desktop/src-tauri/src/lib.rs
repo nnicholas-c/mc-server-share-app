@@ -8,7 +8,7 @@ use std::{
   process::{Child, Command, Stdio},
   sync::Mutex,
   thread,
-  time::{Duration, SystemTime, UNIX_EPOCH},
+  time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Emitter, Manager, State};
 use walkdir::WalkDir;
@@ -36,7 +36,7 @@ struct DesktopProfile {
   share_code: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct ArchiveResult {
   path: String,
@@ -44,6 +44,31 @@ struct ArchiveResult {
   sha256: String,
   size: u64,
   archive_format: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BlobClientTokenResponse {
+  client_token: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UploadedBlob {
+  url: String,
+  download_url: String,
+  pathname: String,
+  content_type: String,
+  content_disposition: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ArchiveUploadProgress {
+  upload_id: String,
+  loaded: u64,
+  total: u64,
+  percentage: f64,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -175,6 +200,86 @@ fn download_archive(
   }
 
   archive_result(path)
+}
+
+#[tauri::command]
+fn upload_archive(
+  app: AppHandle,
+  archive: ArchiveResult,
+  coordinator_url: String,
+  endpoint: String,
+  client_payload: serde_json::Value,
+  upload_id: String,
+) -> Result<UploadedBlob, String> {
+  if endpoint != "/api/uploads/world-token" && endpoint != "/api/uploads/package-token" {
+    return Err("Unsupported upload endpoint".into());
+  }
+
+  let archive_path = PathBuf::from(&archive.path);
+  let file = File::open(&archive_path).map_err(|error| error.to_string())?;
+  let content_type = archive_content_type(&archive.archive_format);
+  let client = reqwest::blocking::Client::new();
+  let handle_upload_url = format!(
+    "{}{}",
+    coordinator_url.trim_end_matches('/'),
+    endpoint
+  );
+
+  let token_event = serde_json::json!({
+    "type": "blob.generate-client-token",
+    "payload": {
+      "pathname": archive.file_name.clone(),
+      "clientPayload": serde_json::to_string(&client_payload).map_err(|error| error.to_string())?,
+      "multipart": false
+    }
+  });
+
+  let token_response = client
+    .post(handle_upload_url)
+    .header("content-type", "application/json")
+    .body(token_event.to_string())
+    .send()
+    .map_err(|error| error.to_string())?;
+
+  if !token_response.status().is_success() {
+    let status = token_response.status();
+    let body = token_response.text().unwrap_or_default();
+    return Err(format!("Upload token request failed with {status}: {body}"));
+  }
+
+  let token_body = token_response.text().map_err(|error| error.to_string())?;
+  let token_response: BlobClientTokenResponse =
+    serde_json::from_str(&token_body).map_err(|error| error.to_string())?;
+  let store_id = parse_blob_store_id(&token_response.client_token)?;
+  let blob_url = blob_api_url(&archive.file_name)?;
+  let request_id = format!("{}:{}:mc-share-desktop", store_id, timestamp_millis());
+
+  emit_archive_upload_progress(&app, &upload_id, 0, archive.size);
+  let reader = ProgressReader::new(file, app.clone(), upload_id.clone(), archive.size);
+  let response = client
+    .put(blob_url)
+    .header("authorization", format!("Bearer {}", token_response.client_token))
+    .header("x-vercel-blob-access", "public")
+    .header("x-content-type", content_type)
+    .header("x-vercel-blob-store-id", store_id)
+    .header("x-api-version", "12")
+    .header("x-api-blob-request-id", request_id)
+    .header("x-api-blob-request-attempt", "0")
+    .header("x-content-length", archive.size.to_string())
+    .body(reqwest::blocking::Body::sized(reader, archive.size))
+    .send()
+    .map_err(|error| error.to_string())?;
+
+  if !response.status().is_success() {
+    let status = response.status();
+    let body = response.text().unwrap_or_default();
+    return Err(format!("Blob upload failed with {status}: {body}"));
+  }
+
+  let body = response.text().map_err(|error| error.to_string())?;
+  let blob: UploadedBlob = serde_json::from_str(&body).map_err(|error| error.to_string())?;
+  emit_archive_upload_progress(&app, &upload_id, archive.size, archive.size);
+  Ok(blob)
 }
 
 #[tauri::command]
@@ -503,6 +608,102 @@ fn emit_process_log(app: &AppHandle, process: &str, line: &str) {
   );
 }
 
+struct ProgressReader<R> {
+  inner: R,
+  app: AppHandle,
+  upload_id: String,
+  loaded: u64,
+  total: u64,
+  last_emit: Instant,
+  last_loaded: u64,
+}
+
+impl<R: Read> ProgressReader<R> {
+  fn new(inner: R, app: AppHandle, upload_id: String, total: u64) -> Self {
+    Self {
+      inner,
+      app,
+      upload_id,
+      loaded: 0,
+      total,
+      last_emit: Instant::now(),
+      last_loaded: 0,
+    }
+  }
+
+  fn maybe_emit(&mut self) {
+    let elapsed = self.last_emit.elapsed() >= Duration::from_millis(150);
+    let advanced = self.loaded.saturating_sub(self.last_loaded) >= 512 * 1024;
+    let complete = self.loaded >= self.total;
+
+    if elapsed || advanced || complete {
+      emit_archive_upload_progress(&self.app, &self.upload_id, self.loaded, self.total);
+      self.last_emit = Instant::now();
+      self.last_loaded = self.loaded;
+    }
+  }
+}
+
+impl<R: Read> Read for ProgressReader<R> {
+  fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+    let read = self.inner.read(buffer)?;
+    if read > 0 {
+      self.loaded = self.loaded.saturating_add(read as u64);
+      self.maybe_emit();
+    }
+    Ok(read)
+  }
+}
+
+fn emit_archive_upload_progress(app: &AppHandle, upload_id: &str, loaded: u64, total: u64) {
+  let percentage = if total == 0 {
+    0.0
+  } else {
+    ((loaded as f64 / total as f64) * 100.0).clamp(0.0, 100.0)
+  };
+
+  let _ = app.emit(
+    "archive-upload-progress",
+    ArchiveUploadProgress {
+      upload_id: upload_id.to_string(),
+      loaded,
+      total,
+      percentage,
+    },
+  );
+}
+
+fn archive_content_type(archive_format: &str) -> &'static str {
+  if archive_format == "zip" {
+    "application/zip"
+  } else {
+    "application/zstd"
+  }
+}
+
+fn blob_api_url(pathname: &str) -> Result<reqwest::Url, String> {
+  let mut url = reqwest::Url::parse("https://vercel.com/api/blob/")
+    .map_err(|error| error.to_string())?;
+  url.query_pairs_mut().append_pair("pathname", pathname);
+  Ok(url)
+}
+
+fn parse_blob_store_id(client_token: &str) -> Result<String, String> {
+  client_token
+    .split('_')
+    .nth(3)
+    .filter(|store_id| !store_id.is_empty())
+    .map(|store_id| store_id.to_string())
+    .ok_or_else(|| "Blob client token did not include a store id".to_string())
+}
+
+fn timestamp_millis() -> u128 {
+  SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .unwrap_or_default()
+    .as_millis()
+}
+
 fn shell_command(command: &str) -> Command {
   #[cfg(target_os = "windows")]
   {
@@ -663,6 +864,7 @@ pub fn run() {
       create_world_archive,
       create_server_archive,
       download_archive,
+      upload_archive,
       extract_server_package,
       restore_world_archive,
       verify_file_sha256,

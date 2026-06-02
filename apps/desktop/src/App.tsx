@@ -57,6 +57,35 @@ function formatBytes(bytes: number) {
   return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
+function delay(ms: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+async function retryUploadFinalization<T>(
+  operation: () => Promise<T>,
+  onRetry: () => void
+) {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 15; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!String(error).includes("No completed upload matches")) {
+        throw error;
+      }
+
+      onRetry();
+      await delay(1000);
+    }
+  }
+
+  throw lastError;
+}
+
 type ProcessLog = {
   process: "minecraft" | "playit";
   line: string;
@@ -485,7 +514,7 @@ export default function App() {
       await invoke("stop_playit");
       setStatus("Creating world archive...");
       const archive = await invoke<LocalArchive>("create_world_archive", { profile });
-      setStatus(`Reading world archive (${formatBytes(archive.size)})...`);
+      setStatus(`Preparing world archive upload (${formatBytes(archive.size)})...`);
       const blob = await uploadArchive({
         archive,
         coordinatorUrl,
@@ -503,18 +532,22 @@ export default function App() {
       });
 
       setStatus("Finalizing uploaded world snapshot...");
-      await completeSession({
-        coordinatorUrl,
-        sessionId: lock.session.id,
-        request: {
-          lockToken: lock.lockToken,
-          blobUrl: blob.url,
-          sha256: archive.sha256,
-          size: archive.size,
-          archiveFormat: archive.archiveFormat,
-          hostDisplayName: displayName
-        }
-      });
+      await retryUploadFinalization(
+        () =>
+          completeSession({
+            coordinatorUrl,
+            sessionId: lock.session.id,
+            request: {
+              lockToken: lock.lockToken,
+              blobUrl: blob.url,
+              sha256: archive.sha256,
+              size: archive.size,
+              archiveFormat: archive.archiveFormat,
+              hostDisplayName: displayName
+            }
+          }),
+        () => setStatus("Finalizing uploaded world snapshot...")
+      );
 
       setLock(null);
       setManifest(await getManifest(coordinatorUrl, manifest.code));
@@ -536,7 +569,7 @@ export default function App() {
     try {
       setStatus("Creating server package archive...");
       const archive = await invoke<LocalArchive>("create_server_archive", { profile });
-      setStatus(`Reading server package (${formatBytes(archive.size)})...`);
+      setStatus(`Preparing server package upload (${formatBytes(archive.size)})...`);
       const blob = await uploadArchive({
         archive,
         coordinatorUrl,
@@ -553,17 +586,21 @@ export default function App() {
       });
 
       setStatus("Finalizing server package...");
-      await publishPackage({
-        coordinatorUrl,
-        shareCode: manifest.code,
-        request: {
-          adminToken,
-          blobUrl: blob.url,
-          sha256: archive.sha256,
-          size: archive.size,
-          archiveFormat: archive.archiveFormat
-        }
-      });
+      await retryUploadFinalization(
+        () =>
+          publishPackage({
+            coordinatorUrl,
+            shareCode: manifest.code,
+            request: {
+              adminToken,
+              blobUrl: blob.url,
+              sha256: archive.sha256,
+              size: archive.size,
+              archiveFormat: archive.archiveFormat
+            }
+          }),
+        () => setStatus("Finalizing server package...")
+      );
 
       setManifest(await getManifest(coordinatorUrl, manifest.code));
       setStatus("Server package published.");

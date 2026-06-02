@@ -1,5 +1,5 @@
-import { upload } from "@vercel/blob/client";
-import { readFile } from "@tauri-apps/plugin-fs";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { ArchiveFormat } from "@mc-share/protocol";
 
 export type LocalArchive = {
@@ -24,7 +24,9 @@ export type UploadProgress = {
   percentage: number;
 };
 
-const multipartThresholdBytes = 8 * 1024 * 1024;
+type NativeUploadProgress = UploadProgress & {
+  uploadId: string;
+};
 
 export async function uploadArchive(input: {
   archive: LocalArchive;
@@ -33,19 +35,32 @@ export async function uploadArchive(input: {
   clientPayload: Record<string, unknown>;
   onUploadProgress?: (progress: UploadProgress) => void;
 }): Promise<UploadedBlob> {
-  const bytes = await readFile(input.archive.path);
-  const contentType =
-    input.archive.archiveFormat === "zip" ? "application/zip" : "application/zstd";
-  const file = new File([bytes], input.archive.fileName, {
-    type: contentType
-  });
+  const uploadId = createUploadId();
+  const unlisten = input.onUploadProgress
+    ? await listen<NativeUploadProgress>("archive-upload-progress", (event) => {
+        if (event.payload.uploadId === uploadId) {
+          input.onUploadProgress?.(event.payload);
+        }
+      })
+    : undefined;
 
-  return upload(input.archive.fileName, file, {
-    access: "public",
-    contentType,
-    handleUploadUrl: `${input.coordinatorUrl.replace(/\/$/, "")}${input.endpoint}`,
-    clientPayload: JSON.stringify(input.clientPayload),
-    multipart: input.archive.size >= multipartThresholdBytes,
-    onUploadProgress: input.onUploadProgress
-  });
+  try {
+    return await invoke<UploadedBlob>("upload_archive", {
+      archive: input.archive,
+      coordinatorUrl: input.coordinatorUrl,
+      endpoint: input.endpoint,
+      clientPayload: input.clientPayload,
+      uploadId
+    });
+  } finally {
+    unlisten?.();
+  }
+}
+
+function createUploadId() {
+  if (typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
