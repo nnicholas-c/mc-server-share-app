@@ -1,4 +1,4 @@
-const CURRENT_SHARE_CODE = "8UQLLQ";
+const CURRENT_SHARE_CODE = "NTKPTG";
 const CURRENT_SHARE_URL = `/share/${CURRENT_SHARE_CODE}`;
 const DOWNLOAD_URL = "https://github.com/nnicholas-c/mc-server-share-app/releases/latest";
 const PLAYIT_DOWNLOAD = "https://playit.gg/download";
@@ -58,7 +58,7 @@ export default function GuidePage() {
             <li>Download the installer for your computer.</li>
             <li>Install and open <strong>MC Server Share</strong>.</li>
             <li>Enter your <strong>Display name</strong>.</li>
-            <li>Paste your group&apos;s share code. For the current test share, use <code>{CURRENT_SHARE_CODE}</code>.</li>
+            <li>Paste your group&apos;s share code. For the current published share, use <code>{CURRENT_SHARE_CODE}</code>.</li>
             <li>Click <strong>Load Share</strong>.</li>
             <li>Set up playit.gg once, then click <strong>Set playit</strong> in the app.</li>
             <li>Click <strong>Download &amp; Host</strong>.</li>

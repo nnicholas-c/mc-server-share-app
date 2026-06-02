@@ -5,7 +5,7 @@ MC Server Share lets a group of friends take turns hosting the same Minecraft Ja
 - **Website:** https://mc-server-share-app.vercel.app
 - **Friend hosting guide:** https://mc-server-share-app.vercel.app/guide
 - **Latest app download:** https://github.com/nnicholas-c/mc-server-share-app/releases/latest
-- **Current test share:** https://mc-server-share-app.vercel.app/share/8UQLLQ
+- **Current published share:** https://mc-server-share-app.vercel.app/share/NTKPTG
 
 ## What The App Does
 
@@ -33,7 +33,7 @@ Use this when sending the GitHub repo or Releases page to a friend.
 
 3. Install and open **MC Server Share**.
 4. Enter your display name.
-5. Paste the share code your group is using. For the current test share, use `8UQLLQ`.
+5. Paste the share code your group is using. For the current published share, use `NTKPTG`.
 6. Click **Load Share**.
 7. Install playit.gg once from https://playit.gg/download.
 8. In playit.gg, make sure your agent has a **Minecraft Java** tunnel pointing to `127.0.0.1:25565`.
@@ -48,7 +48,7 @@ If the share status says **Server package: Not published yet**, the admin needs 
 
 Use this when sending the website to a friend.
 
-1. Send them the share page, for example: https://mc-server-share-app.vercel.app/share/8UQLLQ
+1. Send them the share page, for example: https://mc-server-share-app.vercel.app/share/NTKPTG
 2. They click **Download App** if they have not installed it yet.
 3. They click **Open App to Host** from the share page.
 4. They set up playit.gg once, if needed.

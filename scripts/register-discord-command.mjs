@@ -3,9 +3,8 @@
  *
  * Prerequisites:
  *   1. Create a Discord Application at https://discord.com/developers/applications
- *   2. Copy Application ID, Public Key, and Bot Token into apps/coordinator/.env.local
- *   3. Set the Interactions Endpoint URL in your Discord app to:
- *      https://mc-server-share-app.vercel.app/api/discord
+ *   2. Copy Application ID and Bot Token into apps/coordinator/.env.local
+ *   3. Set PUBLIC_COORDINATOR_URL in apps/coordinator/.env.local if not using production
  *
  * Run with:
  *   node scripts/register-discord-command.mjs
@@ -31,6 +30,9 @@ const env = Object.fromEntries(
 
 const appId = env.DISCORD_APPLICATION_ID;
 const token = env.DISCORD_BOT_TOKEN;
+const coordinatorUrl = (env.PUBLIC_COORDINATOR_URL ?? "https://mc-server-share-app.vercel.app")
+  .replace(/\/$/, "");
+const interactionsEndpointUrl = `${coordinatorUrl}/api/discord`;
 
 if (!appId || !token) {
   console.error("Set DISCORD_APPLICATION_ID and DISCORD_BOT_TOKEN in apps/coordinator/.env.local first.");
@@ -41,6 +43,21 @@ const command = {
   name: "host",
   description: "Check who is hosting the Minecraft server or get the link to start hosting.",
 };
+
+const appRes = await fetch("https://discord.com/api/v10/applications/@me", {
+  method: "PATCH",
+  headers: { Authorization: token, "Content-Type": "application/json" },
+  body: JSON.stringify({ interactions_endpoint_url: interactionsEndpointUrl }),
+});
+
+if (!appRes.ok) {
+  const body = await appRes.text();
+  console.error(`Failed to set interactions endpoint (${appRes.status}): ${body}`);
+  process.exit(1);
+}
+
+const app = await appRes.json();
+console.log(`✅ Set interactions endpoint: ${app.interactions_endpoint_url}`);
 
 const res = await fetch(`https://discord.com/api/v10/applications/${appId}/commands`, {
   method: "POST",

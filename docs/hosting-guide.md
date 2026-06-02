@@ -4,17 +4,17 @@ This guide is the short version you can send to friends who need to host the Min
 
 - **Website:** https://mc-server-share-app.vercel.app
 - **Latest app download:** https://github.com/nnicholas-c/mc-server-share-app/releases/latest
-- **Example share page:** https://mc-server-share-app.vercel.app/share/8UQLLQ
-- **Example share code:** `8UQLLQ`
+- **Example share page:** https://mc-server-share-app.vercel.app/share/NTKPTG
+- **Example share code:** `NTKPTG`
 
-Use the share code or share page your group gives you. The `8UQLLQ` code is the current test share from setup.
+Use the share code or share page your group gives you. The `NTKPTG` code is the current published share from setup.
 
 ## Friends: Hosting For The First Time
 
 1. Download MC Server Share from https://github.com/nnicholas-c/mc-server-share-app/releases/latest.
 2. Install and open the app.
 3. Enter your display name.
-4. Paste the share code, such as `8UQLLQ`.
+4. Paste the share code, such as `NTKPTG`.
 5. Click **Load Share**.
 6. Download playit.gg from https://playit.gg/download.
 7. Run playit once and verify/login if prompted.
@@ -29,7 +29,7 @@ You do not need the admin token to host. You only need the share code and a work
 
 ## Friends: Hosting From The Website
 
-1. Open the share page, for example https://mc-server-share-app.vercel.app/share/8UQLLQ.
+1. Open the share page, for example https://mc-server-share-app.vercel.app/share/NTKPTG.
 2. Click **Download App** if MC Server Share is not installed yet.
 3. Click **Open App to Host**.
 4. Confirm the share is loaded in the app.
